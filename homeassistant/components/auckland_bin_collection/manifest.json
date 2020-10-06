@@ -1,0 +1,8 @@
+{
+  "domain": "auckland_bin_collection",
+  "name": "Auckland Bin Collection",
+  "documentation": "https://www.example.com",
+  "requirements": ["beautifulsoup4==4.9.1"],
+  "codeowners": ["@fishy242"],
+  "quality_scale": "internal"
+}
