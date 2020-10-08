@@ -1,16 +1,15 @@
 """Sensor to indicate whether the current day is bin collection day in Auckland."""
-# from datetime import date
-# from datetime import timedelta
 import datetime
 import logging
-from urllib import request
 
 from bs4 import BeautifulSoup
 from dateutil.parser import parse
 import voluptuous as vol
 
 from homeassistant.components.binary_sensor import PLATFORM_SCHEMA, BinarySensorEntity
+from homeassistant.components.rest.sensor import RestData
 from homeassistant.const import CONF_NAME
+from homeassistant.exceptions import PlatformNotReady
 import homeassistant.helpers.config_validation as cv
 
 SCAN_INTERVAL = datetime.timedelta(hours=1)
@@ -42,24 +41,37 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 
-def setup_platform(hass, config, add_entities, discovery_info=None):
+async def async_setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the Auckland Bin Day sensor."""
     loc = config[CONF_LOC]
     alert_hour = config[CONF_ALERT_HOURS]
     sensor_name = config[CONF_NAME]
-
-    add_entities([AucklandBinDay(loc, alert_hour, sensor_name)], True)
-
-
-def fetch_data(loc):
-    """Fetch data IO shouldn't be here."""
-    council_url = (
+    method = "GET"
+    resource = (
         "https://www.aucklandcouncil.govt.nz/rubbish-recycling/rubbish-recycling-collections/Pages/collection-day-detail.aspx?an="
         + loc
     )  # 12344022656"
-    council_page = request.urlopen(council_url)
+    auth = None
+    headers = None
+    payload = None
+    verify_ssl = True
+    rest = RestData(method, resource, auth, headers, payload, verify_ssl)
+    rest.update()
 
-    soup = BeautifulSoup(council_page, "html.parser")
+    if rest.data is None:
+        raise PlatformNotReady
+
+    add_entities([AucklandBinDay(rest, loc, alert_hour, sensor_name)], True)
+
+
+def fetch_data(name, rest):
+    """Fetch data IO shouldn't be here."""
+    rest.update()
+    if rest.data is None:
+        _LOGGER.error("Unable to retrieve data for %s", name)
+        return
+
+    soup = BeautifulSoup(rest.data, "html.parser")
     box = soup.find(
         id="ctl00_SPWebPartManager1_g_dfe289d2_6a8a_414d_a384_fc25a0db9a6d_ctl00_pnlHouseholdBlock"
     )
@@ -70,10 +82,12 @@ def fetch_data(loc):
     for date_line in date_box:
         date_str = date_line.text.strip()
         # date_str = "3 May"
-        dt = parse(date_str)
+        dt_obj = parse(date_str)
 
-        if dt.date() < datetime.date.today():  # if date < today date, this is next year
-            dt = dt.replace(year=dt.year + 1)
+        if (
+            dt_obj.date() < datetime.date.today()
+        ):  # if date < today date, this is next year
+            dt_obj = dt_obj.replace(year=dt_obj.year + 1)
 
         collect_line = date_line.parent.find_all("span", attrs={"class": "sr-only"})
         collect_list = []
@@ -82,7 +96,7 @@ def fetch_data(loc):
 
         result = {
             "DateString": date_str,
-            "Date": dt.date(),
+            "Date": dt_obj.date(),
             "Collect": collect_list,
         }
         ret.append(result)
@@ -93,8 +107,9 @@ def fetch_data(loc):
 class AucklandBinDay(BinarySensorEntity):
     """Implementation of Auckland Waste Collection sensor."""
 
-    def __init__(self, loc, hours, name):
+    def __init__(self, rest, loc, hours, name):
         """Initialize the Auckland Waste Collection Sensor."""
+        self.rest = rest
         self._name = name
         self._loc = loc
         self._hours = hours
@@ -146,7 +161,8 @@ class AucklandBinDay(BinarySensorEntity):
         self._is_recycle_2 = "No"
         self._last_update = datetime.datetime.now()
 
-        data = fetch_data(self._loc)
+        # data = fetch_data(self._loc)
+        data = fetch_data(self._name, self.rest)
 
         for item in data:
             collect_dt = datetime.datetime.combine(item["Date"], datetime.time.min)
@@ -175,44 +191,3 @@ class AucklandBinDay(BinarySensorEntity):
             self._is_rubbish_2 = "Yes"
         if "Recycle" in collect[1]:
             self._is_recycle_2 = "Yes"
-
-
-"""
-if __name__ == "__main__":
-    print("Execute Main")
-    data = fetch_data("12344022656")
-
-    date_string = []
-    date_obj = []
-    collect = []
-
-    for item in data:
-        collect_dt = datetime.datetime.combine(item["Date"], datetime.time.min)
-        alert_dt = datetime.datetime.now() + datetime.timedelta(hours=12)
-        print(collect_dt)
-        print(alert_dt)
-        if alert_dt > collect_dt:
-            print("state on now")
-
-        date_obj.append(item["Date"])
-        if item["Date"] == datetime.date.today():
-            date_string.append("Today")
-        elif item["Date"] == datetime.date.today() + datetime.timedelta(days=1):
-            date_string.append("Tomorrow")
-        else:
-            date_string.append(item["DateString"])
-
-        collect.append(item["Collect"])
-
-    print(date_string)
-    print(date_obj)
-    print(collect)
-    if "Rubbish" in collect[0]:
-        print("Next Rubbish Yes")
-    if "Recycle" in collect[0]:
-        print("Next Recycle Yes")
-    if "Rubbish" in collect[1]:
-        print("Next Rubbish 2 Yes")
-    if "Recycle" in collect[1]:
-        print("Next Recycle 2 Yes")
-"""

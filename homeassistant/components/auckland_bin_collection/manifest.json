@@ -3,6 +3,7 @@
   "name": "Auckland Bin Collection",
   "documentation": "https://www.example.com",
   "requirements": ["beautifulsoup4==4.9.1"],
+  "after_dependencies": ["rest"],
   "codeowners": ["@fishy242"],
   "quality_scale": "internal"
 }
