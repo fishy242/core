@@ -1,6 +1,4 @@
 """Support for AlarmDecoder-based alarm control panels (Honeywell/DSC)."""
-import logging
-
 import voluptuous as vol
 
 from homeassistant.components.alarm_control_panel import (
@@ -21,9 +19,9 @@ from homeassistant.const import (
     STATE_ALARM_DISARMED,
     STATE_ALARM_TRIGGERED,
 )
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import (
     CONF_ALT_NIGHT_MODE,
@@ -36,8 +34,6 @@ from .const import (
     SIGNAL_PANEL_MESSAGE,
 )
 
-_LOGGER = logging.getLogger(__name__)
-
 SERVICE_ALARM_TOGGLE_CHIME = "alarm_toggle_chime"
 
 SERVICE_ALARM_KEYPRESS = "alarm_keypress"
@@ -45,7 +41,7 @@ ATTR_KEYPRESS = "keypress"
 
 
 async def async_setup_entry(
-    hass: HomeAssistantType, entry: ConfigEntry, async_add_entities
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ):
     """Set up for AlarmDecoder alarm panels."""
     options = entry.options
@@ -60,8 +56,7 @@ async def async_setup_entry(
     )
     async_add_entities([entity])
 
-    platform = entity_platform.current_platform.get()
-
+    platform = entity_platform.async_get_current_platform()
     platform.async_register_entity_service(
         SERVICE_ALARM_TOGGLE_CHIME,
         {
@@ -167,7 +162,7 @@ class AlarmDecoderAlarmPanel(AlarmControlPanelEntity):
         return self._code_arm_required
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes."""
         return {
             "ac_power": self._ac_power,

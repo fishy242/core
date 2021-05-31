@@ -4,7 +4,7 @@
             "single_instance_allowed": "Allerede konfigurert. Bare \u00e9n enkelt konfigurasjon er mulig."
         },
         "error": {
-            "cannot_connect": "Tilkobling mislyktes.",
+            "cannot_connect": "Tilkobling mislyktes",
             "invalid_auth": "Ugyldig godkjenning",
             "unknown": "Uventet feil"
         },
@@ -21,10 +21,10 @@
         "step": {
             "init": {
                 "data": {
+                    "ph_offset": "pH-forskyvning (positiv eller negativ)",
                     "polling_interval": "Avstemningsintervall (i sekunder)"
                 }
             }
         }
-    },
-    "title": "Omnilogic"
+    }
 }

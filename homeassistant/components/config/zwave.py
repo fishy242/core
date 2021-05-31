@@ -54,7 +54,7 @@ class ZWaveLogView(HomeAssistantView):
             return Response(text="Invalid datetime", status=HTTP_BAD_REQUEST)
 
         hass = request.app["hass"]
-        response = await hass.async_add_job(self._get_log, hass, lines)
+        response = await hass.async_add_executor_job(self._get_log, hass, lines)
 
         return Response(text="\n".join(response))
 
@@ -226,7 +226,7 @@ class ZWaveProtectionView(HomeAssistantView):
                 return self.json(protection_options)
             protections = node.get_protections()
             protection_options = {
-                "value_id": "{:d}".format(list(protections)[0]),
+                "value_id": f"{list(protections)[0]:d}",
                 "selected": node.get_protection_item(list(protections)[0]),
                 "options": node.get_protection_items(list(protections)[0]),
             }

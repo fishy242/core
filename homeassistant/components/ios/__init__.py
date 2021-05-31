@@ -1,6 +1,5 @@
 """Native Home Assistant iOS app component."""
 import datetime
-import logging
 
 import voluptuous as vol
 
@@ -10,6 +9,7 @@ from homeassistant.const import HTTP_BAD_REQUEST, HTTP_INTERNAL_SERVER_ERROR
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv, discovery
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util.json import load_json, save_json
 
 from .const import (
@@ -24,8 +24,6 @@ from .const import (
     CONF_ACTIONS,
     DOMAIN,
 )
-
-_LOGGER = logging.getLogger(__name__)
 
 CONF_PUSH = "push"
 CONF_PUSH_CATEGORIES = "categories"
@@ -214,20 +212,20 @@ CONFIGURATION_FILE = ".ios.conf"
 
 def devices_with_push(hass):
     """Return a dictionary of push enabled targets."""
-    targets = {}
-    for device_name, device in hass.data[DOMAIN][ATTR_DEVICES].items():
-        if device.get(ATTR_PUSH_ID) is not None:
-            targets[device_name] = device.get(ATTR_PUSH_ID)
-    return targets
+    return {
+        device_name: device.get(ATTR_PUSH_ID)
+        for device_name, device in hass.data[DOMAIN][ATTR_DEVICES].items()
+        if device.get(ATTR_PUSH_ID) is not None
+    }
 
 
 def enabled_push_ids(hass):
     """Return a list of push enabled target push IDs."""
-    push_ids = []
-    for device in hass.data[DOMAIN][ATTR_DEVICES].values():
-        if device.get(ATTR_PUSH_ID) is not None:
-            push_ids.append(device.get(ATTR_PUSH_ID))
-    return push_ids
+    return [
+        device.get(ATTR_PUSH_ID)
+        for device in hass.data[DOMAIN][ATTR_DEVICES].values()
+        if device.get(ATTR_PUSH_ID) is not None
+    ]
 
 
 def devices(hass):
@@ -339,19 +337,13 @@ class iOSIdentifyDeviceView(HomeAssistantView):
 
         hass = request.app["hass"]
 
-        # Commented for now while iOS app is getting frequent updates
-        # try:
-        #     data = IDENTIFY_SCHEMA(req_data)
-        # except vol.Invalid as ex:
-        #     return self.json_message(
-        #         vol.humanize.humanize_error(request.json, ex),
-        #         HTTP_BAD_REQUEST)
-
         data[ATTR_LAST_SEEN_AT] = datetime.datetime.now().isoformat()
 
-        name = data.get(ATTR_DEVICE_ID)
+        device_id = data[ATTR_DEVICE_ID]
 
-        hass.data[DOMAIN][ATTR_DEVICES][name] = data
+        hass.data[DOMAIN][ATTR_DEVICES][device_id] = data
+
+        async_dispatcher_send(hass, f"{DOMAIN}.{device_id}", data)
 
         try:
             save_json(self._config_path, hass.data[DOMAIN])

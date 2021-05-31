@@ -1,5 +1,6 @@
 """Support for monitoring plants."""
 from collections import deque
+from contextlib import suppress
 from datetime import datetime, timedelta
 import logging
 
@@ -282,7 +283,8 @@ class Plant(Entity):
         """After being added to hass, load from history."""
         if ENABLE_LOAD_HISTORY and "recorder" in self.hass.config.components:
             # only use the database if it's configured
-            self.hass.async_add_job(self._load_history_from_db)
+            await self.hass.async_add_executor_job(self._load_history_from_db)
+            self.async_write_ha_state()
 
         async_track_state_change_event(
             self.hass, list(self._sensormap), self._state_changed_event
@@ -293,7 +295,7 @@ class Plant(Entity):
             if state is not None:
                 self.state_changed(entity_id, state)
 
-    async def _load_history_from_db(self):
+    def _load_history_from_db(self):
         """Load the history of the brightness values from the database.
 
         This only needs to be done once during startup.
@@ -323,14 +325,11 @@ class Plant(Entity):
             for state in states:
                 # filter out all None, NaN and "unknown" states
                 # only keep real values
-                try:
+                with suppress(ValueError):
                     self._brightness_history.add_measurement(
                         int(state.state), state.last_updated
                     )
-                except ValueError:
-                    pass
         _LOGGER.debug("Initializing from database completed")
-        self.async_write_ha_state()
 
     @property
     def should_poll(self):
@@ -348,7 +347,7 @@ class Plant(Entity):
         return self._state
 
     @property
-    def state_attributes(self):
+    def extra_state_attributes(self):
         """Return the attributes of the entity.
 
         Provide the individual measurements from the

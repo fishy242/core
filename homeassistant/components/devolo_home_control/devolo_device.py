@@ -18,9 +18,11 @@ class DevoloDeviceEntity(Entity):
         self._unique_id = element_uid
         self._homecontrol = homecontrol
         self._name = device_instance.settings_property["general_device_settings"].name
+        self._area = device_instance.settings_property["general_device_settings"].zone
         self._device_class = None
         self._value = None
         self._unit = None
+        self._enabled_default = True
 
         # This is not doing I/O. It fetches an internal state of the API
         self._available = device_instance.is_online()
@@ -58,7 +60,13 @@ class DevoloDeviceEntity(Entity):
             "name": self._name,
             "manufacturer": self._brand,
             "model": self._model,
+            "suggested_area": self._area,
         }
+
+    @property
+    def entity_registry_enabled_default(self) -> bool:
+        """Return if the entity should be enabled when first added to the entity registry."""
+        return self._enabled_default
 
     @property
     def should_poll(self):
@@ -84,8 +92,10 @@ class DevoloDeviceEntity(Entity):
         self.schedule_update_ha_state()
 
     def _generic_message(self, message):
-        """Handle unexpected messages."""
-        if message[0].startswith("hdm"):
+        """Handle generic messages."""
+        if len(message) == 3 and message[2] == "battery_level":
+            self._value = message[1]
+        elif len(message) == 3 and message[2] == "status":
             # Maybe the API wants to tell us, that the device went on- or offline.
             self._available = self._device_instance.is_online()
         else:

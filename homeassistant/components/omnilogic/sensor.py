@@ -1,8 +1,5 @@
 """Definition and setup of the Omnilogic Sensors for Home Assistant."""
-
-import logging
-
-from homeassistant.components.sensor import DEVICE_CLASS_TEMPERATURE
+from homeassistant.components.sensor import DEVICE_CLASS_TEMPERATURE, SensorEntity
 from homeassistant.const import (
     CONCENTRATION_PARTS_PER_MILLION,
     MASS_GRAMS,
@@ -12,10 +9,8 @@ from homeassistant.const import (
     VOLUME_LITERS,
 )
 
-from .common import OmniLogicEntity, OmniLogicUpdateCoordinator
-from .const import COORDINATOR, DOMAIN, PUMP_TYPES
-
-_LOGGER = logging.getLogger(__name__)
+from .common import OmniLogicEntity, OmniLogicUpdateCoordinator, check_guard
+from .const import COORDINATOR, DEFAULT_PH_OFFSET, DOMAIN, PUMP_TYPES
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -34,18 +29,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
         for entity_setting in entity_settings:
             for state_key, entity_class in entity_setting["entity_classes"].items():
-                if state_key not in item:
-                    continue
-
-                guard = False
-                for guard_condition in entity_setting["guard_condition"]:
-                    if guard_condition and all(
-                        item.get(guard_key) == guard_value
-                        for guard_key, guard_value in guard_condition.items()
-                    ):
-                        guard = True
-
-                if guard:
+                if check_guard(state_key, item, entity_setting):
                     continue
 
                 entity = entity_class(
@@ -64,7 +48,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(entities)
 
 
-class OmnilogicSensor(OmniLogicEntity):
+class OmnilogicSensor(OmniLogicEntity, SensorEntity):
     """Defines an Omnilogic sensor entity."""
 
     def __init__(
@@ -77,7 +61,7 @@ class OmnilogicSensor(OmniLogicEntity):
         unit: str,
         item_id: tuple,
         state_key: str,
-    ):
+    ) -> None:
         """Initialize Entities."""
         super().__init__(
             coordinator=coordinator,
@@ -119,7 +103,7 @@ class OmniLogicTemperatureSensor(OmnilogicSensor):
         state = sensor_data
 
         if self._unit_type == "Metric":
-            hayward_state = round((hayward_state - 32) * 5 / 9, 1)
+            hayward_state = round((int(hayward_state) - 32) * 5 / 9, 1)
             hayward_unit_of_measure = TEMP_CELSIUS
 
         if int(sensor_data) == -1:
@@ -141,13 +125,18 @@ class OmniLogicPumpSpeedSensor(OmnilogicSensor):
     def state(self):
         """Return the state for the pump speed sensor."""
 
-        pump_type = PUMP_TYPES[self.coordinator.data[self._item_id]["Filter-Type"]]
+        pump_type = PUMP_TYPES[
+            self.coordinator.data[self._item_id].get(
+                "Filter-Type", self.coordinator.data[self._item_id].get("Type", {})
+            )
+        ]
         pump_speed = self.coordinator.data[self._item_id][self._state_key]
 
         if pump_type == "VARIABLE":
             self._unit = PERCENTAGE
             state = pump_speed
         elif pump_type == "DUAL":
+            self._unit = None
             if pump_speed == 0:
                 state = "off"
             elif pump_speed == self.coordinator.data[self._item_id].get(
@@ -175,7 +164,7 @@ class OmniLogicSaltLevelSensor(OmnilogicSensor):
         unit_of_measurement = self._unit
 
         if self._unit_type == "Metric":
-            salt_return = round(salt_return / 1000, 2)
+            salt_return = round(int(salt_return) / 1000, 2)
             unit_of_measurement = f"{MASS_GRAMS}/{VOLUME_LITERS}"
 
         self._unit = unit_of_measurement
@@ -205,6 +194,12 @@ class OmniLogicPHSensor(OmnilogicSensor):
 
         if ph_state == 0:
             ph_state = None
+        else:
+            ph_state = float(ph_state) + float(
+                self.coordinator.config_entry.options.get(
+                    "ph_offset", DEFAULT_PH_OFFSET
+                )
+            )
 
         return ph_state
 
@@ -222,7 +217,7 @@ class OmniLogicORPSensor(OmnilogicSensor):
         device_class: str,
         icon: str,
         unit: str,
-    ):
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(
             coordinator=coordinator,
@@ -239,7 +234,7 @@ class OmniLogicORPSensor(OmnilogicSensor):
     def state(self):
         """Return the state for the ORP sensor."""
 
-        orp_state = self.coordinator.data[self._item_id][self._state_key]
+        orp_state = int(self.coordinator.data[self._item_id][self._state_key])
 
         if orp_state == -1:
             orp_state = None
@@ -279,7 +274,7 @@ SENSOR_TYPES = {
             "icon": "mdi:speedometer",
             "unit": PERCENTAGE,
             "guard_condition": [
-                {"Type": "FMT_SINGLE_SPEED"},
+                {"Filter-Type": "FMT_SINGLE_SPEED"},
             ],
         },
     ],

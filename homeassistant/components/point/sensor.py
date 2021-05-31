@@ -1,7 +1,7 @@
 """Support for Minut Point sensors."""
 import logging
 
-from homeassistant.components.sensor import DOMAIN
+from homeassistant.components.sensor import DOMAIN, SensorEntity
 from homeassistant.const import (
     DEVICE_CLASS_HUMIDITY,
     DEVICE_CLASS_PRESSURE,
@@ -47,7 +47,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     )
 
 
-class MinutPointSensor(MinutPointEntity):
+class MinutPointSensor(MinutPointEntity, SensorEntity):
     """The platform class required by Home Assistant."""
 
     def __init__(self, point_client, device_id, device_class):
@@ -57,13 +57,11 @@ class MinutPointSensor(MinutPointEntity):
 
     async def _update_callback(self):
         """Update the value of the sensor."""
+        _LOGGER.debug("Update sensor value for %s", self)
         if self.is_updated:
-            _LOGGER.debug("Update sensor value for %s", self)
-            self._value = await self.hass.async_add_executor_job(
-                self.device.sensor, self.device_class
-            )
+            self._value = await self.device.sensor(self.device_class)
             self._updated = parse_datetime(self.device.last_update)
-            self.async_write_ha_state()
+        self.async_write_ha_state()
 
     @property
     def icon(self):

@@ -1,21 +1,19 @@
 """Platform for binary sensor integration."""
-import logging
-
 from homeassistant.components.binary_sensor import (
     DEVICE_CLASS_DOOR,
     DEVICE_CLASS_HEAT,
     DEVICE_CLASS_MOISTURE,
     DEVICE_CLASS_MOTION,
+    DEVICE_CLASS_PROBLEM,
+    DEVICE_CLASS_SAFETY,
     DEVICE_CLASS_SMOKE,
     BinarySensorEntity,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .devolo_device import DevoloDeviceEntity
-
-_LOGGER = logging.getLogger(__name__)
 
 DEVICE_CLASS_MAPPING = {
     "Water alarm": DEVICE_CLASS_MOISTURE,
@@ -23,38 +21,40 @@ DEVICE_CLASS_MAPPING = {
     "Smoke Alarm": DEVICE_CLASS_SMOKE,
     "Heat Alarm": DEVICE_CLASS_HEAT,
     "door": DEVICE_CLASS_DOOR,
+    "overload": DEVICE_CLASS_SAFETY,
 }
 
 
 async def async_setup_entry(
-    hass: HomeAssistantType, entry: ConfigEntry, async_add_entities
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
     """Get all binary sensor and multi level sensor devices and setup them via config entry."""
     entities = []
 
-    for device in hass.data[DOMAIN]["homecontrol"].binary_sensor_devices:
-        for binary_sensor in device.binary_sensor_property:
-            entities.append(
-                DevoloBinaryDeviceEntity(
-                    homecontrol=hass.data[DOMAIN]["homecontrol"],
-                    device_instance=device,
-                    element_uid=binary_sensor,
-                )
-            )
-    for device in hass.data[DOMAIN]["homecontrol"].devices.values():
-        if hasattr(device, "remote_control_property"):
-            for remote in device.remote_control_property:
-                for index in range(
-                    1, device.remote_control_property[remote].key_count + 1
-                ):
-                    entities.append(
-                        DevoloRemoteControl(
-                            homecontrol=hass.data[DOMAIN]["homecontrol"],
-                            device_instance=device,
-                            element_uid=remote,
-                            key=index,
-                        )
+    for gateway in hass.data[DOMAIN][entry.entry_id]["gateways"]:
+        for device in gateway.binary_sensor_devices:
+            for binary_sensor in device.binary_sensor_property:
+                entities.append(
+                    DevoloBinaryDeviceEntity(
+                        homecontrol=gateway,
+                        device_instance=device,
+                        element_uid=binary_sensor,
                     )
+                )
+        for device in gateway.devices.values():
+            if hasattr(device, "remote_control_property"):
+                for remote in device.remote_control_property:
+                    for index in range(
+                        1, device.remote_control_property[remote].key_count + 1
+                    ):
+                        entities.append(
+                            DevoloRemoteControl(
+                                homecontrol=gateway,
+                                device_instance=device,
+                                element_uid=remote,
+                                key=index,
+                            )
+                        )
     async_add_entities(entities, False)
 
 
@@ -85,6 +85,10 @@ class DevoloBinaryDeviceEntity(DevoloDeviceEntity, BinarySensorEntity):
                 self._name += f" {device_instance.binary_sensor_property.get(element_uid).sensor_type}"
 
         self._value = self._binary_sensor_property.state
+
+        if element_uid.startswith("devolo.WarningBinaryFI:"):
+            self._device_class = DEVICE_CLASS_PROBLEM
+            self._enabled_default = False
 
     @property
     def is_on(self):

@@ -1,6 +1,4 @@
 """Config flow for Speedtest.net."""
-import logging
-
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -15,17 +13,14 @@ from .const import (
     DEFAULT_NAME,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SERVER,
+    DOMAIN,
 )
-from .const import DOMAIN  # pylint: disable=unused-import
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class SpeedTestFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle Speedtest.net config flow."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
     @staticmethod
     @callback
@@ -54,7 +49,7 @@ class SpeedTestFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="wrong_server_id")
 
         import_config[CONF_SCAN_INTERVAL] = int(
-            import_config[CONF_SCAN_INTERVAL].seconds / 60
+            import_config[CONF_SCAN_INTERVAL].total_seconds() / 60
         )
         import_config.pop(CONF_MONITORED_CONDITIONS)
 

@@ -1,19 +1,14 @@
 """Support for ZoneMinder sensors."""
 import logging
-from typing import Callable, List, Optional
 
 import voluptuous as vol
-from zoneminder.monitor import Monitor, TimePeriod
-from zoneminder.zm import ZoneMinder
+from zoneminder.monitor import TimePeriod
 
-from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN, PLATFORM_SCHEMA
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.const import CONF_MONITORED_CONDITIONS
-from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.entity import Entity
 
-from .common import get_client_from_data, get_platform_configs
+from . import DOMAIN as ZONEMINDER_DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,49 +36,34 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    async_add_entities: Callable[[List[Entity], Optional[bool]], None],
-) -> None:
-    """Set up the sensor config entry."""
-    zm_client = get_client_from_data(hass, config_entry.unique_id)
-    monitors = await hass.async_add_job(zm_client.get_monitors)
-
-    if not monitors:
-        _LOGGER.warning("Did not fetch any monitors from ZoneMinder")
+def setup_platform(hass, config, add_entities, discovery_info=None):
+    """Set up the ZoneMinder sensor platform."""
+    include_archived = config.get(CONF_INCLUDE_ARCHIVED)
 
     sensors = []
-    for monitor in monitors:
-        sensors.append(ZMSensorMonitors(monitor, config_entry))
+    for zm_client in hass.data[ZONEMINDER_DOMAIN].values():
+        monitors = zm_client.get_monitors()
+        if not monitors:
+            _LOGGER.warning("Could not fetch any monitors from ZoneMinder")
 
-        for config in get_platform_configs(hass, SENSOR_DOMAIN):
-            include_archived = config.get(CONF_INCLUDE_ARCHIVED)
+        for monitor in monitors:
+            sensors.append(ZMSensorMonitors(monitor))
 
             for sensor in config[CONF_MONITORED_CONDITIONS]:
-                sensors.append(
-                    ZMSensorEvents(monitor, include_archived, sensor, config_entry)
-                )
+                sensors.append(ZMSensorEvents(monitor, include_archived, sensor))
 
-    sensors.append(ZMSensorRunState(zm_client, config_entry))
-
-    async_add_entities(sensors, True)
+        sensors.append(ZMSensorRunState(zm_client))
+    add_entities(sensors)
 
 
-class ZMSensorMonitors(Entity):
+class ZMSensorMonitors(SensorEntity):
     """Get the status of each ZoneMinder monitor."""
 
-    def __init__(self, monitor: Monitor, config_entry: ConfigEntry):
+    def __init__(self, monitor):
         """Initialize monitor sensor."""
         self._monitor = monitor
-        self._config_entry = config_entry
         self._state = None
         self._is_available = None
-
-    @property
-    def unique_id(self) -> Optional[str]:
-        """Return a unique ID."""
-        return f"{self._config_entry.unique_id}_{self._monitor.id}_status"
 
     @property
     def name(self):
@@ -110,28 +90,16 @@ class ZMSensorMonitors(Entity):
         self._is_available = self._monitor.is_available
 
 
-class ZMSensorEvents(Entity):
+class ZMSensorEvents(SensorEntity):
     """Get the number of events for each monitor."""
 
-    def __init__(
-        self,
-        monitor: Monitor,
-        include_archived: bool,
-        sensor_type: str,
-        config_entry: ConfigEntry,
-    ):
+    def __init__(self, monitor, include_archived, sensor_type):
         """Initialize event sensor."""
 
         self._monitor = monitor
         self._include_archived = include_archived
         self.time_period = TimePeriod.get_time_period(sensor_type)
-        self._config_entry = config_entry
         self._state = None
-
-    @property
-    def unique_id(self) -> Optional[str]:
-        """Return a unique ID."""
-        return f"{self._config_entry.unique_id}_{self._monitor.id}_{self.time_period.value}_{self._include_archived}_events"
 
     @property
     def name(self):
@@ -153,20 +121,14 @@ class ZMSensorEvents(Entity):
         self._state = self._monitor.get_events(self.time_period, self._include_archived)
 
 
-class ZMSensorRunState(Entity):
+class ZMSensorRunState(SensorEntity):
     """Get the ZoneMinder run state."""
 
-    def __init__(self, client: ZoneMinder, config_entry: ConfigEntry):
+    def __init__(self, client):
         """Initialize run state sensor."""
         self._state = None
         self._is_available = None
         self._client = client
-        self._config_entry = config_entry
-
-    @property
-    def unique_id(self) -> Optional[str]:
-        """Return a unique ID."""
-        return f"{self._config_entry.unique_id}_runstate"
 
     @property
     def name(self):

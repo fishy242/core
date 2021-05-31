@@ -1,6 +1,8 @@
 """Common vera code."""
-import logging
-from typing import DefaultDict, List, NamedTuple, Set
+from __future__ import annotations
+
+from collections import defaultdict
+from typing import NamedTuple
 
 import pyvera as pv
 
@@ -11,19 +13,17 @@ from homeassistant.helpers.event import call_later
 
 from .const import DOMAIN
 
-_LOGGER = logging.getLogger(__name__)
-
 
 class ControllerData(NamedTuple):
     """Controller data."""
 
     controller: pv.VeraController
-    devices: DefaultDict[str, List[pv.VeraDevice]]
-    scenes: List[pv.VeraScene]
+    devices: defaultdict[str, list[pv.VeraDevice]]
+    scenes: list[pv.VeraScene]
     config_entry: ConfigEntry
 
 
-def get_configured_platforms(controller_data: ControllerData) -> Set[str]:
+def get_configured_platforms(controller_data: ControllerData) -> set[str]:
     """Get configured platforms for a controller."""
     platforms = []
     for platform in controller_data.devices:

@@ -1,7 +1,6 @@
 """Support for SimpliSafe locks."""
 from simplipy.errors import SimplipyError
 from simplipy.lock import LockStates
-from simplipy.websocket import EVENT_LOCK_LOCKED, EVENT_LOCK_UNLOCKED
 
 from homeassistant.components.lock import LockEntity
 from homeassistant.core import callback
@@ -17,13 +16,17 @@ ATTR_PIN_PAD_LOW_BATTERY = "pin_pad_low_battery"
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up SimpliSafe locks based on a config entry."""
     simplisafe = hass.data[DOMAIN][DATA_CLIENT][entry.entry_id]
-    async_add_entities(
-        [
-            SimpliSafeLock(simplisafe, system, lock)
-            for system in simplisafe.systems.values()
-            for lock in system.locks.values()
-        ]
-    )
+    locks = []
+
+    for system in simplisafe.systems.values():
+        if system.version == 2:
+            LOGGER.info("Skipping lock setup for V2 system: %s", system.system_id)
+            continue
+
+        for lock in system.locks.values():
+            locks.append(SimpliSafeLock(simplisafe, system, lock))
+
+    async_add_entities(locks)
 
 
 class SimpliSafeLock(SimpliSafeEntity, LockEntity):
@@ -32,11 +35,8 @@ class SimpliSafeLock(SimpliSafeEntity, LockEntity):
     def __init__(self, simplisafe, system, lock):
         """Initialize."""
         super().__init__(simplisafe, system, lock.name, serial=lock.serial)
-        self._is_locked = False
         self._lock = lock
-
-        for event_type in (EVENT_LOCK_LOCKED, EVENT_LOCK_UNLOCKED):
-            self.websocket_events_to_listen_for.append(event_type)
+        self._is_locked = None
 
     @property
     def is_locked(self):
@@ -52,6 +52,7 @@ class SimpliSafeLock(SimpliSafeEntity, LockEntity):
             return
 
         self._is_locked = True
+        self.async_write_ha_state()
 
     async def async_unlock(self, **kwargs):
         """Unlock the lock."""
@@ -62,6 +63,7 @@ class SimpliSafeLock(SimpliSafeEntity, LockEntity):
             return
 
         self._is_locked = False
+        self.async_write_ha_state()
 
     @callback
     def async_update_from_rest_api(self):
@@ -74,10 +76,4 @@ class SimpliSafeLock(SimpliSafeEntity, LockEntity):
             }
         )
 
-    @callback
-    def async_update_from_websocket_event(self, event):
-        """Update the entity with the provided websocket event data."""
-        if event.event_type == EVENT_LOCK_LOCKED:
-            self._is_locked = True
-        else:
-            self._is_locked = False
+        self._is_locked = self._lock.state == LockStates.locked

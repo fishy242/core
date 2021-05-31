@@ -1,6 +1,6 @@
 {
   "config": {
-    "flow_title": "forked-daapd server: {name} ({host})",
+    "flow_title": "{name} ({host})",
     "step": {
       "user": {
         "title": "Set up forked-daapd device",
@@ -13,6 +13,7 @@
       }
     },
     "error": {
+      "forbidden": "Unable to connect. Please check your forked-daapd network permissions.",
       "websocket_not_enabled": "forked-daapd server websocket not enabled.",
       "wrong_host_or_port": "Unable to connect. Please check host and port.",
       "wrong_password": "Incorrect password.",

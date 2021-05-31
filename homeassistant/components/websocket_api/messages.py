@@ -1,8 +1,9 @@
 """Message templates for websocket commands."""
+from __future__ import annotations
 
 from functools import lru_cache
 import logging
-from typing import Any, Dict
+from typing import Any, Final
 
 import voluptuous as vol
 
@@ -12,28 +13,31 @@ from homeassistant.util.json import (
     find_paths_unserializable_data,
     format_unserializable_data,
 )
+from homeassistant.util.yaml.loader import JSON_TYPE
 
 from . import const
 
-_LOGGER = logging.getLogger(__name__)
-# mypy: allow-untyped-defs
+_LOGGER: Final = logging.getLogger(__name__)
 
 # Minimal requirements of a message
-MINIMAL_MESSAGE_SCHEMA = vol.Schema(
+MINIMAL_MESSAGE_SCHEMA: Final = vol.Schema(
     {vol.Required("id"): cv.positive_int, vol.Required("type"): cv.string},
     extra=vol.ALLOW_EXTRA,
 )
 
 # Base schema to extend by message handlers
-BASE_COMMAND_MESSAGE_SCHEMA = vol.Schema({vol.Required("id"): cv.positive_int})
+BASE_COMMAND_MESSAGE_SCHEMA: Final = vol.Schema({vol.Required("id"): cv.positive_int})
+
+IDEN_TEMPLATE: Final = "__IDEN__"
+IDEN_JSON_TEMPLATE: Final = '"__IDEN__"'
 
 
-def result_message(iden: int, result: Any = None) -> Dict:
+def result_message(iden: int, result: Any = None) -> dict[str, Any]:
     """Return a success result message."""
     return {"id": iden, "type": const.TYPE_RESULT, "success": True, "result": result}
 
 
-def error_message(iden: int, code: str, message: str) -> Dict:
+def error_message(iden: int | None, code: str, message: str) -> dict[str, Any]:
     """Return an error result message."""
     return {
         "id": iden,
@@ -43,12 +47,11 @@ def error_message(iden: int, code: str, message: str) -> Dict:
     }
 
 
-def event_message(iden: int, event: Any) -> Dict:
+def event_message(iden: JSON_TYPE, event: Any) -> dict[str, Any]:
     """Return an event message."""
     return {"id": iden, "type": "event", "event": event}
 
 
-@lru_cache(maxsize=128)
 def cached_event_message(iden: int, event: Event) -> str:
     """Return an event message.
 
@@ -58,10 +61,20 @@ def cached_event_message(iden: int, event: Event) -> str:
     all getting many of the same events (mostly state changed)
     we can avoid serializing the same data for each connection.
     """
-    return message_to_json(event_message(iden, event))
+    return _cached_event_message(event).replace(IDEN_JSON_TEMPLATE, str(iden), 1)
 
 
-def message_to_json(message: Any) -> str:
+@lru_cache(maxsize=128)
+def _cached_event_message(event: Event) -> str:
+    """Cache and serialize the event to json.
+
+    The IDEN_TEMPLATE is used which will be replaced
+    with the actual iden in cached_event_message
+    """
+    return message_to_json(event_message(IDEN_TEMPLATE, event))
+
+
+def message_to_json(message: dict[str, Any]) -> str:
     """Serialize a websocket message to json."""
     try:
         return const.JSON_DUMP(message)

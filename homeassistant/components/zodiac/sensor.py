@@ -1,7 +1,5 @@
 """Support for tracking the zodiac sign."""
-import logging
-
-from homeassistant.helpers.entity import Entity
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.util.dt import as_local, utcnow
 
 from .const import (
@@ -28,8 +26,6 @@ from .const import (
     SIGN_TAURUS,
     SIGN_VIRGO,
 )
-
-_LOGGER = logging.getLogger(__name__)
 
 ZODIAC_BY_DATE = (
     (
@@ -166,7 +162,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     async_add_entities([ZodiacSensor()], True)
 
 
-class ZodiacSensor(Entity):
+class ZodiacSensor(SensorEntity):
     """Representation of a Zodiac sensor."""
 
     def __init__(self):
@@ -200,7 +196,7 @@ class ZodiacSensor(Entity):
         return ZODIAC_ICONS.get(self._state)
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes."""
         return self._attrs
 

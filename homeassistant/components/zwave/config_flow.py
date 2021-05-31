@@ -1,7 +1,6 @@
 """Config flow to configure Z-Wave."""
 # pylint: disable=import-outside-toplevel
 from collections import OrderedDict
-import logging
 
 import voluptuous as vol
 
@@ -14,15 +13,11 @@ from .const import (
     DOMAIN,
 )
 
-_LOGGER = logging.getLogger(__name__)
 
-
-@config_entries.HANDLERS.register(DOMAIN)
-class ZwaveFlowHandler(config_entries.ConfigFlow):
+class ZwaveFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a Z-Wave config flow."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
 
     def __init__(self):
         """Initialize the Z-Wave config flow."""

@@ -1,6 +1,4 @@
 """The Wolf SmartSet sensors."""
-import logging
-
 from wolf_smartset.models import (
     HoursParameter,
     ListItemParameter,
@@ -11,6 +9,7 @@ from wolf_smartset.models import (
     Temperature,
 )
 
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import (
     DEVICE_CLASS_PRESSURE,
     DEVICE_CLASS_TEMPERATURE,
@@ -21,8 +20,6 @@ from homeassistant.const import (
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import COORDINATOR, DEVICE_ID, DOMAIN, PARAMETERS, STATES
-
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -50,7 +47,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     async_add_entities(entities, True)
 
 
-class WolfLinkSensor(CoordinatorEntity):
+class WolfLinkSensor(CoordinatorEntity, SensorEntity):
     """Base class for all Wolf entities."""
 
     def __init__(self, coordinator, wolf_object: Parameter, device_id):
@@ -73,7 +70,7 @@ class WolfLinkSensor(CoordinatorEntity):
         return self._state
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes."""
         return {
             "parameter_id": self.wolf_object.parameter_id,

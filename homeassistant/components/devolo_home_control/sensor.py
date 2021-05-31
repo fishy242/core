@@ -1,60 +1,73 @@
 """Platform for sensor integration."""
-import logging
-
 from homeassistant.components.sensor import (
+    DEVICE_CLASS_BATTERY,
+    DEVICE_CLASS_ENERGY,
     DEVICE_CLASS_HUMIDITY,
     DEVICE_CLASS_ILLUMINANCE,
     DEVICE_CLASS_POWER,
     DEVICE_CLASS_TEMPERATURE,
+    DEVICE_CLASS_VOLTAGE,
+    SensorEntity,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.const import PERCENTAGE
+from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .devolo_device import DevoloDeviceEntity
 
-_LOGGER = logging.getLogger(__name__)
-
 DEVICE_CLASS_MAPPING = {
+    "battery": DEVICE_CLASS_BATTERY,
     "temperature": DEVICE_CLASS_TEMPERATURE,
     "light": DEVICE_CLASS_ILLUMINANCE,
     "humidity": DEVICE_CLASS_HUMIDITY,
     "current": DEVICE_CLASS_POWER,
-    "total": DEVICE_CLASS_POWER,
+    "total": DEVICE_CLASS_ENERGY,
+    "voltage": DEVICE_CLASS_VOLTAGE,
 }
 
 
 async def async_setup_entry(
-    hass: HomeAssistantType, entry: ConfigEntry, async_add_entities
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
     """Get all sensor devices and setup them via config entry."""
     entities = []
 
-    for device in hass.data[DOMAIN]["homecontrol"].multi_level_sensor_devices:
-        for multi_level_sensor in device.multi_level_sensor_property:
-            entities.append(
-                DevoloGenericMultiLevelDeviceEntity(
-                    homecontrol=hass.data[DOMAIN]["homecontrol"],
-                    device_instance=device,
-                    element_uid=multi_level_sensor,
-                )
-            )
-    for device in hass.data[DOMAIN]["homecontrol"].devices.values():
-        if hasattr(device, "consumption_property"):
-            for consumption in device.consumption_property:
-                for consumption_type in ["current", "total"]:
-                    entities.append(
-                        DevoloConsumptionEntity(
-                            homecontrol=hass.data[DOMAIN]["homecontrol"],
-                            device_instance=device,
-                            element_uid=consumption,
-                            consumption=consumption_type,
-                        )
+    for gateway in hass.data[DOMAIN][entry.entry_id]["gateways"]:
+        for device in gateway.multi_level_sensor_devices:
+            for multi_level_sensor in device.multi_level_sensor_property:
+                entities.append(
+                    DevoloGenericMultiLevelDeviceEntity(
+                        homecontrol=gateway,
+                        device_instance=device,
+                        element_uid=multi_level_sensor,
                     )
+                )
+        for device in gateway.devices.values():
+            if hasattr(device, "consumption_property"):
+                for consumption in device.consumption_property:
+                    for consumption_type in ["current", "total"]:
+                        entities.append(
+                            DevoloConsumptionEntity(
+                                homecontrol=gateway,
+                                device_instance=device,
+                                element_uid=consumption,
+                                consumption=consumption_type,
+                            )
+                        )
+            if hasattr(device, "battery_level"):
+                entities.append(
+                    DevoloBatteryEntity(
+                        homecontrol=gateway,
+                        device_instance=device,
+                        element_uid=f"devolo.BatterySensor:{device.uid}",
+                    )
+                )
+
     async_add_entities(entities, False)
 
 
-class DevoloMultiLevelDeviceEntity(DevoloDeviceEntity):
+class DevoloMultiLevelDeviceEntity(DevoloDeviceEntity, SensorEntity):
     """Abstract representation of a multi level sensor within devolo Home Control."""
 
     @property
@@ -102,6 +115,27 @@ class DevoloGenericMultiLevelDeviceEntity(DevoloMultiLevelDeviceEntity):
 
         if self._device_class is None:
             self._name += f" {self._multi_level_sensor_property.sensor_type}"
+
+        if element_uid.startswith("devolo.VoltageMultiLevelSensor:"):
+            self._enabled_default = False
+
+
+class DevoloBatteryEntity(DevoloMultiLevelDeviceEntity):
+    """Representation of a battery entity within devolo Home Control."""
+
+    def __init__(self, homecontrol, device_instance, element_uid):
+        """Initialize a battery sensor."""
+
+        super().__init__(
+            homecontrol=homecontrol,
+            device_instance=device_instance,
+            element_uid=element_uid,
+        )
+
+        self._device_class = DEVICE_CLASS_MAPPING.get("battery")
+
+        self._value = device_instance.battery_level
+        self._unit = PERCENTAGE
 
 
 class DevoloConsumptionEntity(DevoloMultiLevelDeviceEntity):

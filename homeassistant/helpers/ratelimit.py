@@ -1,10 +1,12 @@
 """Ratelimit helper."""
+from __future__ import annotations
+
 import asyncio
+from collections.abc import Hashable
 from datetime import datetime, timedelta
 import logging
-from typing import Any, Callable, Dict, Hashable, Optional
+from typing import Any, Callable
 
-from homeassistant.const import MAX_TIME_TRACKING_ERROR
 from homeassistant.core import HomeAssistant, callback
 import homeassistant.util.dt as dt_util
 
@@ -17,19 +19,21 @@ class KeyedRateLimit:
     def __init__(
         self,
         hass: HomeAssistant,
-    ):
+    ) -> None:
         """Initialize ratelimit tracker."""
         self.hass = hass
-        self._last_triggered: Dict[Hashable, datetime] = {}
-        self._rate_limit_timers: Dict[Hashable, asyncio.TimerHandle] = {}
+        self._last_triggered: dict[Hashable, datetime] = {}
+        self._rate_limit_timers: dict[Hashable, asyncio.TimerHandle] = {}
 
     @callback
     def async_has_timer(self, key: Hashable) -> bool:
         """Check if a rate limit timer is running."""
+        if not self._rate_limit_timers:
+            return False
         return key in self._rate_limit_timers
 
     @callback
-    def async_triggered(self, key: Hashable, now: Optional[datetime] = None) -> None:
+    def async_triggered(self, key: Hashable, now: datetime | None = None) -> None:
         """Call when the action we are tracking was triggered."""
         self.async_cancel_timer(key)
         self._last_triggered[key] = now or dt_util.utcnow()
@@ -37,7 +41,7 @@ class KeyedRateLimit:
     @callback
     def async_cancel_timer(self, key: Hashable) -> None:
         """Cancel a rate limit time that will call the action."""
-        if not self.async_has_timer(key):
+        if not self._rate_limit_timers or not self.async_has_timer(key):
             return
 
         self._rate_limit_timers.pop(key).cancel()
@@ -53,11 +57,11 @@ class KeyedRateLimit:
     def async_schedule_action(
         self,
         key: Hashable,
-        rate_limit: Optional[timedelta],
+        rate_limit: timedelta | None,
         now: datetime,
         action: Callable,
         *args: Any,
-    ) -> Optional[datetime]:
+    ) -> datetime | None:
         """Check rate limits and schedule an action if we hit the limit.
 
         If the rate limit is hit:
@@ -71,10 +75,14 @@ class KeyedRateLimit:
 
             Return None
         """
-        if rate_limit is None or key not in self._last_triggered:
+        if rate_limit is None:
             return None
 
-        next_call_time = self._last_triggered[key] + rate_limit
+        last_triggered = self._last_triggered.get(key)
+        if not last_triggered:
+            return None
+
+        next_call_time = last_triggered + rate_limit
 
         if next_call_time <= now:
             self.async_cancel_timer(key)
@@ -89,7 +97,7 @@ class KeyedRateLimit:
 
         if key not in self._rate_limit_timers:
             self._rate_limit_timers[key] = self.hass.loop.call_later(
-                (next_call_time - now).total_seconds() + MAX_TIME_TRACKING_ERROR,
+                (next_call_time - now).total_seconds(),
                 action,
                 *args,
             )

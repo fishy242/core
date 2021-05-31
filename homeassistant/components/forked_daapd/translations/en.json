@@ -5,13 +5,14 @@
             "not_forked_daapd": "Device is not a forked-daapd server."
         },
         "error": {
+            "forbidden": "Unable to connect. Please check your forked-daapd network permissions.",
             "unknown_error": "Unexpected error",
             "websocket_not_enabled": "forked-daapd server websocket not enabled.",
             "wrong_host_or_port": "Unable to connect. Please check host and port.",
             "wrong_password": "Incorrect password.",
             "wrong_server_type": "The forked-daapd integration requires a forked-daapd server with version >= 27.0."
         },
-        "flow_title": "forked-daapd server: {name} ({host})",
+        "flow_title": "{name} ({host})",
         "step": {
             "user": {
                 "data": {

@@ -1,10 +1,8 @@
 """Offer time listening automation rules."""
-import logging
-
 import voluptuous as vol
 
 from homeassistant.const import CONF_PLATFORM
-from homeassistant.core import callback
+from homeassistant.core import HassJob, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.event import async_track_time_change
 
@@ -13,8 +11,6 @@ from homeassistant.helpers.event import async_track_time_change
 CONF_HOURS = "hours"
 CONF_MINUTES = "minutes"
 CONF_SECONDS = "seconds"
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class TimePattern:
@@ -61,9 +57,11 @@ TRIGGER_SCHEMA = vol.All(
 
 async def async_attach_trigger(hass, config, action, automation_info):
     """Listen for state changes based on configuration."""
+    trigger_id = automation_info.get("trigger_id") if automation_info else None
     hours = config.get(CONF_HOURS)
     minutes = config.get(CONF_MINUTES)
     seconds = config.get(CONF_SECONDS)
+    job = HassJob(action)
 
     # If larger units are specified, default the smaller units to zero
     if minutes is None and hours is not None:
@@ -74,13 +72,14 @@ async def async_attach_trigger(hass, config, action, automation_info):
     @callback
     def time_automation_listener(now):
         """Listen for time changes and calls action."""
-        hass.async_run_job(
-            action,
+        hass.async_run_hass_job(
+            job,
             {
                 "trigger": {
                     "platform": "time_pattern",
                     "now": now,
                     "description": "time pattern",
+                    "id": trigger_id,
                 }
             },
         )

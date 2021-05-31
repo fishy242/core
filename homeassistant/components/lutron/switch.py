@@ -1,11 +1,7 @@
 """Support for Lutron switches."""
-import logging
-
 from homeassistant.components.switch import SwitchEntity
 
 from . import LUTRON_CONTROLLER, LUTRON_DEVICES, LutronDevice
-
-_LOGGER = logging.getLogger(__name__)
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
@@ -46,7 +42,7 @@ class LutronSwitch(LutronDevice, SwitchEntity):
         self._lutron_device.level = 0
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes."""
         return {"lutron_integration_id": self._lutron_device.id}
 
@@ -79,7 +75,7 @@ class LutronLed(LutronDevice, SwitchEntity):
         self._lutron_device.state = 0
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes."""
         return {
             "keypad": self._keypad_name,

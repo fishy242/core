@@ -1,13 +1,15 @@
 """Offer state listening automation rules."""
+from __future__ import annotations
+
 from datetime import timedelta
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import voluptuous as vol
 
 from homeassistant import exceptions
 from homeassistant.const import CONF_ATTRIBUTE, CONF_FOR, CONF_PLATFORM, MATCH_ALL
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, State, callback
+from homeassistant.core import CALLBACK_TYPE, HassJob, HomeAssistant, State, callback
 from homeassistant.helpers import config_validation as cv, template
 from homeassistant.helpers.event import (
     Event,
@@ -79,17 +81,23 @@ async def async_attach_trigger(
     template.attach(hass, time_delta)
     match_all = from_state == MATCH_ALL and to_state == MATCH_ALL
     unsub_track_same = {}
-    period: Dict[str, timedelta] = {}
+    period: dict[str, timedelta] = {}
     match_from_state = process_state_match(from_state)
     match_to_state = process_state_match(to_state)
     attribute = config.get(CONF_ATTRIBUTE)
+    job = HassJob(action)
+
+    trigger_id = automation_info.get("trigger_id") if automation_info else None
+    _variables = {}
+    if automation_info:
+        _variables = automation_info.get("variables") or {}
 
     @callback
     def state_automation_listener(event: Event):
         """Listen for state changes and calls action."""
         entity: str = event.data["entity_id"]
-        from_s: Optional[State] = event.data.get("old_state")
-        to_s: Optional[State] = event.data.get("new_state")
+        from_s: State | None = event.data.get("old_state")
+        to_s: State | None = event.data.get("new_state")
 
         if from_s is None:
             old_value = None
@@ -122,8 +130,8 @@ async def async_attach_trigger(
         @callback
         def call_action():
             """Call action with right context."""
-            hass.async_run_job(
-                action,
+            hass.async_run_hass_job(
+                job,
                 {
                     "trigger": {
                         "platform": platform_type,
@@ -133,6 +141,7 @@ async def async_attach_trigger(
                         "for": time_delta if not time_delta else period[entity],
                         "attribute": attribute,
                         "description": f"state of {entity}",
+                        "id": trigger_id,
                     }
                 },
                 event.context,
@@ -142,7 +151,7 @@ async def async_attach_trigger(
             call_action()
             return
 
-        variables = {
+        trigger_info = {
             "trigger": {
                 "platform": "state",
                 "entity_id": entity,
@@ -150,6 +159,7 @@ async def async_attach_trigger(
                 "to_state": to_s,
             }
         }
+        variables = {**_variables, **trigger_info}
 
         try:
             period[entity] = cv.positive_time_period(

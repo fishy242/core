@@ -4,7 +4,7 @@
             "single_instance_allowed": "Juba seadistatud. V\u00f5imalik on ainult \u00fcks seadistamine."
         },
         "error": {
-            "cannot_connect": "\u00dchendus nurjus",
+            "cannot_connect": "\u00dchendamine nurjus",
             "invalid_auth": "Tuvastamise viga",
             "unknown": "Tundmatu viga"
         },
@@ -21,6 +21,7 @@
         "step": {
             "init": {
                 "data": {
+                    "ph_offset": "pH nihe (positiivne v\u00f5i negatiivne)",
                     "polling_interval": "P\u00e4ringute intervall (sekundites)"
                 }
             }
