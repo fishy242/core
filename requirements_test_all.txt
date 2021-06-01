@@ -7,7 +7,7 @@
 AEMET-OpenData==0.2.1
 
 # homeassistant.components.homekit
-HAP-python==3.4.1
+HAP-python==3.5.0
 
 # homeassistant.components.flick_electric
 PyFlick==0.0.2
@@ -112,7 +112,7 @@ aioguardian==1.0.4
 aioharmony==0.2.7
 
 # homeassistant.components.homekit_controller
-aiohomekit==0.2.65
+aiohomekit==0.2.66
 
 # homeassistant.components.emulated_hue
 # homeassistant.components.http
@@ -341,7 +341,7 @@ gTTS==2.2.2
 garages-amsterdam==2.1.1
 
 # homeassistant.components.garmin_connect
-garminconnect==0.1.19
+garminconnect_aio==0.1.1
 
 # homeassistant.components.geo_json_events
 # homeassistant.components.usgs_earthquakes_feed
@@ -399,7 +399,7 @@ guppy3==3.1.0
 ha-ffmpeg==3.0.2
 
 # homeassistant.components.philips_js
-ha-philipsjs==2.7.3
+ha-philipsjs==2.7.4
 
 # homeassistant.components.habitica
 habitipy==0.2.0
@@ -429,7 +429,7 @@ hole==0.5.1
 holidays==0.11.1
 
 # homeassistant.components.frontend
-home-assistant-frontend==20210528.0
+home-assistant-frontend==20210531.1
 
 # homeassistant.components.zwave
 homeassistant-pyozw==0.1.10
@@ -1280,7 +1280,7 @@ wolf_smartset==0.1.8
 xbox-webapi==2.0.11
 
 # homeassistant.components.knx
-xknx==0.18.2
+xknx==0.18.3
 
 # homeassistant.components.bluesound
 # homeassistant.components.rest
